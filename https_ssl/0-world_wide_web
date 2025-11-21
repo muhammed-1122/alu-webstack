@@ -1,45 +1,70 @@
 #!/usr/bin/env bash
-# Displays the A record type and destination IP for specific subdomains using dig and awk.
+# This script audits the DNS records for a specified domain and subdomains.
+# It uses 'dig' and 'awk' to extract and format the record information.
 
-# Shellcheck ignore: SC2154 is ignored as per task requirements for unassigned variables in the awk block
-# Shellcheck ignore: SC2086 is ignored as per task requirements for unquoted variables in the dig command
+# Disable ShellCheck warnings for unquoted variables in dig (SC2086)
+# and potentially undefined variables in awk (SC2154).
+# shellcheck disable=SC2086,SC2154
+
+# Function to perform DNS lookup and format the output.
+# Arguments:
+# 1. DOMAIN: The base domain name (e.g., "holberton.online").
+# 2. SUB_PREFIX: The subdomain name (e.g., "www", "lb-01").
 audit_subdomain() {
     local DOMAIN="$1"
     local SUB_PREFIX="$2"
     local FULL_SUBDOMAIN="${SUB_PREFIX}.${DOMAIN}"
 
-    # Use awk variable 'sub_name' instead of 'sub' to avoid conflict with the built-in awk function sub().
-    dig "$FULL_SUBDOMAIN" | awk -v sub_name="$SUB_PREFIX" '/^;; ANSWER SECTION:/ {
-        # Set a flag to process lines only within the answer section
-        in_answer=1
-    }
-    # Check if we are in the answer section AND the record type ($5) is 'A'
-    in_answer && $5 == "A" {
-        print "The subdomain " sub_name " is a " $5 " record and points to " $6
-        # Exit awk immediately after finding the A record
-        exit
-    }'
+    # Use 'dig' to query the full domain name.
+    # Pipe the output to 'awk' for filtering and data extraction.
+    dig "$FULL_SUBDOMAIN" | awk -v sub_name="$SUB_PREFIX" '
+        # 1. Look for the start of the Answer Section.
+        /^;; ANSWER SECTION:/ {
+            in_answer=1
+            next # Skip the header line itself
+        }
+
+        # 2. Process the line containing the actual DNS record.
+        # We reliably check for the record class "IN" in field $5.
+        in_answer && $5 == "IN" {
+            # $6 is the Record Type (e.g., A, CNAME)
+            RECORD_TYPE = $6
+            # $7 is the Destination (e.g., IP address, canonical name)
+            DESTINATION = $7
+
+            # Print the required output format.
+            printf "The subdomain %s is a %s record and points to %s\n", sub_name, RECORD_TYPE, DESTINATION
+            
+            # Exit awk immediately after processing the first answer.
+            exit 0
+        }
+        
+        # 3. If we found the answer section but hit the next major section (like ;; AUTHORITY SECTION), stop processing.
+        in_answer && /^;;\s[A-Z]/ { exit 0 }
+    '
 }
 
 # --- Main Logic ---
 
-DOMAIN=$1
-SUBDOMAIN=$2
-SUBDOMAINS=("www" "lb-01" "web-01" "web-02")
-
-# Check 1: If the user did not provide the domain, display usage and exit.
-if [ -z "$DOMAIN" ]; then
-    echo "Usage: 0-world_wide_web DOMAIN_NAME [SUBDOMAIN]"
+# Check if the mandatory domain argument is provided
+if [ $# -lt 1 ]; then
+    echo "Usage: $0 <domain> [subdomain]"
     exit 1
 fi
 
-# Check 2: If only the domain argument is provided (SUBDOMAIN is empty)
+DOMAIN="$1"
+SUBDOMAIN="$2"
+SUBDOMAINS=("www" "lb-01" "web-01" "web-02")
+
+# If only the domain argument is provided (SUBDOMAIN is empty)
 if [ -z "$SUBDOMAIN" ]; then
     # Iterate through the required subdomains in the specified order
     for SUB in "${SUBDOMAINS[@]}"; do
         audit_subdomain "$DOMAIN" "$SUB"
     done
-# Check 3: Both domain and specific subdomain arguments are provided
+# Both domain and specific subdomain arguments are provided
 else
     audit_subdomain "$DOMAIN" "$SUBDOMAIN"
 fi
+
+exit 0
