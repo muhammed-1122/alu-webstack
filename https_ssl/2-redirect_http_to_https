@@ -1,0 +1,45 @@
+HAproxy configuration file for SSL termination (Task 1) and HTTP to HTTPS redirection (Task 2).
+
+Domain: muhammedkenawwal.tech
+
+global
+log /dev/log    local0 notice
+user haproxy
+group haproxy
+daemon
+maxconn 256
+
+defaults
+log     global
+mode    http
+option  httplog
+option  dontlognull
+timeout connect 5000ms
+timeout client 50000ms
+timeout server 50000ms
+
+--- Frontend for HTTP (Port 80) - NEW REDIRECT RULE ---
+
+frontend http_front
+bind *:80
+mode http
+# This line redirects all traffic (code 301) to the same URL using HTTPS.
+redirect scheme https code 301
+
+--- Frontend for HTTPS (Port 443) - SSL Termination ---
+
+frontend https_front
+# Binds to port 443 (HTTPS) and uses your combined certificate file
+bind *:443 ssl crt /etc/haproxy/www.muhammedkenawwal.tech.pem
+mode http
+default_backend http_back
+
+--- Backend Web Servers ---
+
+backend http_back
+mode http
+balance roundrobin
+# web-01 IP
+server web-01 34.207.191.228:80 check
+# web-02 IP
+server web-02 52.90.221.65:80 check

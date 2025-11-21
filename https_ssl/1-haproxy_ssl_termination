@@ -1,0 +1,7 @@
+DOMAIN_PATH=/etc/letsencrypt/live/www.muhammedkenawwal.tech
+PEM_FILE=/etc/haproxy/www.muhammedkenawwal.tech.pem
+
+sudo bash -c "cat $DOMAIN_PATH/fullchain.pem $DOMAIN_PATH/privkey.pem > $PEM_FILE"
+
+# Make sure HAproxy can read the file
+sudo chmod 600 $PEM_FILE
