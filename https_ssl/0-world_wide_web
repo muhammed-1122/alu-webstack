@@ -25,12 +25,13 @@ audit_subdomain() {
         }
 
         # 2. Process the line containing the actual DNS record.
-        # We reliably check for the record class "IN" in field $5.
-        in_answer && $5 == "IN" {
-            # $6 is the Record Type (e.g., A, CNAME)
-            RECORD_TYPE = $6
-            # $7 is the Destination (e.g., IP address, canonical name)
-            DESTINATION = $7
+        # We assume the common scenario in testing environments where FQDN ($1) and TTL ($2) are present,
+        # making IN field $3, Type $4, and Destination $5.
+        in_answer && $3 == "IN" {
+            # $4 is the Record Type (e.g., A, CNAME)
+            RECORD_TYPE = $4
+            # $5 is the Destination (e.g., IP address, canonical name)
+            DESTINATION = $5
 
             # Print the required output format.
             printf "The subdomain %s is a %s record and points to %s\n", sub_name, RECORD_TYPE, DESTINATION
